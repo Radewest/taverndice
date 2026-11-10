@@ -209,7 +209,7 @@ local function build()
   f.targetText:SetTextColor(0.9, 0.82, 0.62)
   f.newBtn = button(board, "New game", 150, 22)
   f.newBtn:SetPoint("BOTTOM", 0, 10)
-  f.newBtn:SetScript("OnClick", function() f.lobby:Show() end)
+  f.newBtn:SetScript("OnClick", function() ns:ShowLobby() end)
 
   -- The felt ---------------------------------------------------------------
   local felt = panel(f, "felt", false)
@@ -430,7 +430,8 @@ function ns:BuildLobby(f)
       end, 250), LX, -84 - (seat - 1) * 26))
   end
   local deal = at(button(p, "Deal me in", 170, 26), LX, -166)
-  deal:SetScript("OnClick", function() p:Hide(); ns:StartFromSettings() end)
+  -- StartFromSettings closes the panel itself, after the new game exists (see HideLobby)
+  deal:SetScript("OnClick", function() ns:StartFromSettings() end)
   local tip = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   at(tip, LX, -202)
   tip:SetWidth(250)
@@ -546,10 +547,11 @@ function ns:BuildLobby(f)
 
   p.back = button(p, "Back to the game", 160, 24)
   p.back:SetPoint("BOTTOM", 0, 10)
-  p.back:SetScript("OnClick", function() p:Hide() end)
+  p.back:SetScript("OnClick", function() ns:HideLobby() end)
   p.leave = button(p, "Leave the table", 140, 24)
   p.leave:SetPoint("LEFT", p.back, "RIGHT", 8, 0)
-  p.leave:SetScript("OnClick", function() ns:LeaveTable(); p:Hide() end)
+  -- leaving ends the game, and with no game the panel stays open for the next one
+  p.leave:SetScript("OnClick", function() ns:LeaveTable() end)
 
   p:SetScript("OnShow", function(self)
     for _, c in ipairs(self.controls) do c:Refresh() end
@@ -570,7 +572,14 @@ function ns:BuildLobby(f)
   return p
 end
 
+-- ns.lobbyOpen mirrors the panel, so tests (and anything else) can check it
+function ns:ShowLobby()
+  ns.lobbyOpen = true
+  if frame and frame.lobby then frame.lobby:Show() end
+end
+
 function ns:HideLobby()
+  ns.lobbyOpen = false
   if frame and frame.lobby then frame.lobby:Hide() end
 end
 
@@ -590,7 +599,11 @@ function ns:StartFromSettings()
     end
   end
   if #players == 1 then players[2] = { name = ns.Bots.STYLES.balanced.name, bot = "balanced" } end
-  return ns:NewGame({ players = players, target = ns.db.target, opening = ns.db.opening, ruleset = ns.db.ruleset, server = ns.db.server })
+  -- Ending the old game above briefly leaves no game, which reopens the panel; so close the
+  -- panel only now, once the new game exists (v0.2.6 fix: "Deal me in" seemed to do nothing).
+  local g = ns:NewGame({ players = players, target = ns.db.target, opening = ns.db.opening, ruleset = ns.db.ruleset, server = ns.db.server })
+  ns:HideLobby()
+  return g
 end
 
 ---------------------------------------------------------------------------
@@ -606,7 +619,7 @@ refresh = function(f)
     f.turnText:SetText(""); f.hint:SetText("")
     f.rollBtn:Disable(); f.bankBtn:Disable()
     f.targetText:SetText("")
-    f.lobby:Show()
+    ns:ShowLobby()
     return
   end
 

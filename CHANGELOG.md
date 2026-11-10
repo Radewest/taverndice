@@ -1,5 +1,9 @@
 # Tavern Dice changelog
 
+## v0.2.6 (2026-11-10)
+- Fixed: clicking *Deal me in* while a game was still going started the new game behind the panel, so it looked like nothing happened.
+- *Leave the table* now leaves the panel open, ready for your next game.
+
 ## v0.2.5 (2026-11-10)
 - Mumpits is now called **Mumpets**. Your saved choice carries over.
 - Undid v0.2.4: every roll scores on its own again, so 1s and 5s don't add up across rolls.

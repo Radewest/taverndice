@@ -406,6 +406,19 @@ ns.db.opponents = { "cautious", "reckless", "reckless" }
 ns:ShowWindow()
 local g2 = ns:StartFromSettings()
 check(#g2.players == 4 and g2.players[4].name ~= g2.players[3].name, "lobby seats become players with unique names")
+-- "Deal me in" in the middle of a game: the panel must close and the new game must start
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 5, 2, 3, 4, 6})[i] end; cb(t, "local") end
+g2:Roll()
+ns:ShowLobby()
+local g3 = ns:StartFromSettings()
+check(ns.game == g3 and g3 ~= g2 and g3.phase == "ready", "dealing in mid-game starts a fresh game")
+check(ns.lobbyOpen == false, "and the panel closes (it used to reopen and cover the table)")
+for i = 1, 5 do ns:ShowLobby(); g3 = ns:StartFromSettings(); g3:Roll() end
+check(ns.lobbyOpen == false and ns.game == g3, "dealing in again and again keeps working")
+D.Roll = realRoll
+ns.game:Abandon(); timers = {}
+check(ns.lobbyOpen == true, "ending a game with no new one reopens the panel")
+g2 = ns:StartFromSettings()
 ns:GetWindow():Refresh()
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 5, 2, 3, 4, 6})[i] end; cb(t, "local") end
 g2:Roll(); g2:Toggle(1); ns:GetWindow():Refresh()

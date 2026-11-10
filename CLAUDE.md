@@ -5,7 +5,7 @@
 ## What it is
 A WoW Forever add-on for playing 10,000 (Farkle / Dix Mille / Zilch / Greed) at the tavern table. v0.1 is solo against bots; v0.2 adds games with friends. Tone: tavern / fantasy roleplay (Harry plays a roleplaying gnome mage). **No** South African flavour in this one.
 - **Owner:** Harry. **Licence:** MIT. **CurseForge project ID:** 1795741. **GitHub:** Radewest/taverndice (source of truth).
-- **Current version:** v0.2.5
+- **Current version:** v0.2.6
 - **Slash:** `/dice` (also `/taverndice`). Saved variables `TavernDiceDB`, `TavernDiceCharDB`.
 
 ## Architecture
@@ -34,6 +34,7 @@ A WoW Forever add-on for playing 10,000 (Farkle / Dix Mille / Zilch / Greed) at 
 - **Dice trust in friend games:** each client rolls its own dice. With server dice on, R includes the raw /roll value; the receiver refuses dice that don't decode from it, and if grouped it checks the /roll line it saw (`Dice.WasSeen`). Far apart and not grouped, the system message isn't visible, so it's trust between friends.
 - **Table talk and protected chat:** /say outdoors needs a hardware event, so Talk only uses SAY inside your own click; async moments (server roll results, a friend's last turn ending the game) use EMOTE / DoEmote.
 - **Finding players needs no server:** a hidden custom channel is the only realm-wide way to reach strangers; SAY/YELL add-on messages only work inside instances. **Not yet verified in Forever:** that add-ons may still join custom channels and send CHANNEL add-on messages under the Midnight rules. Group/guild and target checks work either way.
+- **Lobby open/close goes through `ns:ShowLobby()` / `ns:HideLobby()`** (tracked in `ns.lobbyOpen`). Refresh reopens the panel whenever there's no game, so anything that ends a game and starts another must hide the panel *after* the new game exists (v0.2.6 bug).
 - **Final round:** whoever passes the target triggers one last turn for everyone else; highest score wins.
 - **Bot tuning:** in 150 simulated 3-bot games, balanced won ~42%, cautious and reckless ~29% each, ~17 turns per player to 10,000.
 - **Gold bets are scoreboard only.** Add-ons can't move gold.
