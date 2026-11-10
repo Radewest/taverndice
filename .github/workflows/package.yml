@@ -1,0 +1,28 @@
+name: Package
+
+# Builds TavernDice-vX.Y.Z.zip from a tag and publishes it to GitHub Releases and CurseForge
+# (CHANGELOG.md is used as the changelog). Started by the Release workflow, or by hand:
+# Actions -> Package -> Run workflow -> pick the tag.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package and upload
+        uses: BigWigsMods/packager@v2
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}

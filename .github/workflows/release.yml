@@ -1,0 +1,80 @@
+name: Release
+
+# Fully automatic: on every push to main, read the version from TavernDice.toc.
+#  - New version (no tag yet): run tests, create tag vX.Y.Z, then start "Package".
+#  - Tag exists but has no GitHub Release yet (e.g. a packaging run failed): start "Package" again.
+#  - Otherwise: nothing to do.
+# "Package" is a separate workflow because GitHub doesn't start workflows for tags pushed by
+# the built-in token, but it does allow starting one with workflow_dispatch.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide what to do
+        id: plan
+        run: |
+          VERSION=$(grep -m1 '^## Version:' TavernDice.toc | sed 's/## Version:[[:space:]]*//' | tr -d '\r[:space:]')
+          TAG="v$VERSION"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "New version $TAG - tagging and packaging."
+            echo "action=new" >> "$GITHUB_OUTPUT"
+          elif ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG is tagged but not released yet - packaging."
+            echo "action=package" >> "$GITHUB_OUTPUT"
+          else
+            echo "$TAG is already released - nothing to do."
+            echo "action=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.plan.outputs.action == 'new'
+        with:
+          python-version: "3.12"
+
+      - name: Run tests before releasing
+        if: steps.plan.outputs.action == 'new'
+        run: |
+          pip install lupa luaparser
+          python3 tests/run_tests.py
+
+      - name: Create the version tag
+        if: steps.plan.outputs.action == 'new'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.plan.outputs.tag }}"
+          git push origin "${{ steps.plan.outputs.tag }}"
+
+      - name: Move the unreleased tag to this commit
+        # A tag without a release was never published, so it's safe to move it (keeps the
+        # workflow files and any fixes on the tag the packager builds from).
+        if: steps.plan.outputs.action == 'package'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f "${{ steps.plan.outputs.tag }}"
+          git push -f origin "${{ steps.plan.outputs.tag }}"
+
+      - name: Start packaging
+        if: steps.plan.outputs.action != 'none'
+        run: gh workflow run package.yml --ref "${{ steps.plan.outputs.tag }}"

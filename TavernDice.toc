@@ -1,0 +1,23 @@
+## Interface: 16001
+## Title: |cffffb347Tavern Dice|r
+## IconTexture: Interface\AddOns\TavernDice\media\icon
+## Notes: Play 10,000 (Farkle / Dix Mille) at the tavern table: against the regulars, or a friend near or far.
+## Author: Harry
+## Version: 0.2.2
+## X-Curse-Project-ID: 1795741
+## SavedVariables: TavernDiceDB
+## SavedVariablesPerCharacter: TavernDiceCharDB
+## OptionalDeps: Tjommie
+
+Core.lua
+Bugs.lua
+Scoring.lua
+Dice.lua
+Game.lua
+Bots.lua
+Lines.lua
+Comms.lua
+Nearby.lua
+Talk.lua
+UI.lua
+Minimap.lua
