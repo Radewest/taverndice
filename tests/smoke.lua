@@ -189,6 +189,25 @@ check(gm:NextRollCount() == 2, "with dice to spare, one 5 goes back by default")
 gm:SetFiveBack(false)
 check(gm:NextRollCount() == 1, "keeping both 5s leaves one die")
 gm:Abandon(); timers = {}
+-- 1s and 5s add up across rolls in Mumpits
+gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpits" })
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 2, 3, 4, 6})[i] end; cb(t, "local") end
+gm:Roll(); gm:SetSelection({1, 2})
+check(gm:SelectionScore() == 200, "two 1s = 200")
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 2, 3, 4})[i] end; cb(t, "local") end
+gm:Roll(); gm:SetSelection({1})
+check(gm:SelectionScore() == 800 and gm:PendingTotal() == 1000, "then another 1 makes three 1s = 1,000")
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 5, 2})[i] end; cb(t, "local") end
+gm:Roll(); gm:SetSelection({1, 2})
+check(gm:PendingTotal() == 2050, "a fourth 1 doubles it (2,000) plus a 5")
+gm:Abandon(); timers = {}
+local cg = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "classic" })
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 2, 3, 4, 6})[i] end; cb(t, "local") end
+cg:Roll(); cg:SetSelection({1, 2})
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 2, 3, 4})[i] end; cb(t, "local") end
+cg:Roll(); cg:SetSelection({1})
+check(cg:PendingTotal() == 300, "classic: each roll scores on its own")
+cg:Abandon(); timers = {}
 local opts = ns.ScoringOptions({5, 5}, M)
 check(#opts == 4, "bots see both choices for a pair of 5s")
 D.Roll = realRoll

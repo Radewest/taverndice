@@ -72,6 +72,7 @@ function Game:StartTurn(idx)
   self.turnScore = 0
   self.remaining = 6
   self.kept = {}
+  self.combo = { [1] = 0, [5] = 0 }   -- 1s and 5s set aside since the last full cup (Mumpits)
   self.roll = {}
   self.selected = {}
   self.phase = "ready"
@@ -101,11 +102,34 @@ end
 local function fbWire(v) if v == nil then return "" end return v and "1" or "0" end
 local function fbParse(s) if s == "1" then return true elseif s == "0" then return false end return nil end
 
+-- Points these dice add to the turn. In Mumpits, 1s and 5s already set aside count with them
+-- (two 1s earlier + one 1 now = three 1s = 1,000, so this 1 adds 800).
+-- Returns score, valid, canThrowBack
+function Game:GainFor(vals)
+  local s, ok, can = ns.ScoreSelection(vals, self.rules)
+  if not ok or not (self.rules and self.rules.comboAcross) then return s, ok, can end
+  local combo = self.combo or { [1] = 0, [5] = 0 }
+  if combo[1] + combo[5] == 0 then return s, ok, can end
+  local rest, c1, c5 = {}, 0, 0
+  for _, v in ipairs(vals) do
+    if v == 1 then c1 = c1 + 1 elseif v == 5 then c5 = c5 + 1 else rest[#rest + 1] = v end
+  end
+  local gain = 0
+  if #rest > 0 then
+    local rs, rok = ns.ScoreSelection(rest, self.rules)
+    if not rok then return 0, false, can end
+    gain = rs
+  end
+  gain = gain + ns.OnesFivesScore(1, combo[1] + c1) - ns.OnesFivesScore(1, combo[1])
+              + ns.OnesFivesScore(5, combo[5] + c5) - ns.OnesFivesScore(5, combo[5])
+  return gain, ok, can
+end
+
 -- Returns score, valid, dice used (that leave the cup), dice thrown back, canThrowBack
 function Game:SelectionScore()
   local vals = self:SelectedValues()
   if #vals == 0 then return 0, false, 0, 0, 0 end
-  local s, ok, can = ns.ScoreSelection(vals, self.rules)
+  local s, ok, can = self:GainFor(vals)
   local back = (ok and self:FiveBackActive(#vals, can)) and 1 or 0
   return s, ok, #vals - back, back, can or 0
 end
@@ -176,7 +200,9 @@ function Game:Roll()
     local s, _, n, refund = self:SelectionScore()
     self.turnScore = self.turnScore + s
     local skip5 = refund > 0
+    self.combo = self.combo or { [1] = 0, [5] = 0 }
     for _, v in ipairs(self:SelectedValues()) do
+      if v == 1 or v == 5 then self.combo[v] = self.combo[v] + 1 end   -- a thrown-back 5 still counted
       if skip5 and v == 5 then skip5 = false else self.kept[#self.kept + 1] = v end
     end
     if refund > 0 then ns:Fire("TD_EVENT", "FIVEBACK", self:Player()) end
@@ -184,6 +210,7 @@ function Game:Roll()
     if self.remaining == 0 then
       self.remaining = 6
       self.kept = {}
+      self.combo = { [1] = 0, [5] = 0 }
       ns:Fire("TD_EVENT", "HOTDICE", self:Player(), self.turnScore)
     end
   end

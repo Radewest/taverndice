@@ -1,5 +1,10 @@
 # Tavern Dice changelog
 
+## v0.2.4 (2026-11-10)
+- Mumpits: 1s and 5s you set aside in a turn now add up across rolls. Two 1s, then another 1 = three 1s = 1,000 (and a fourth 1 makes 2,000). The count starts fresh after hot dice. Classic is unchanged.
+- The regulars count this too when choosing dice.
+- Both players need v0.2.4 for Mumpits games together, or the scores won't match.
+
 ## v0.2.3 (2026-11-10)
 - Mumpits: a pair of 5s is now your choice. Keep both, or throw one back in the cup to roll again (both score 100). A button under the hint switches between them.
 - If your last two dice are 5-5, keeping both is the default, so it's **hot dice** instead of rolling one die.

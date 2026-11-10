@@ -20,11 +20,23 @@ ns.RULES = {
 
 -- Rulesets (picked in the new-game panel). Scoring above is shared; these change how a turn plays.
 --   minBank   : you can never bank less than this in one turn
---   fivesPair : two 5s count 100 and one of the 5s goes back into the cup to be rolled again
+--   fivesPair : two 5s count 100 and the player may put one back in the cup to roll again
+--   comboAcross: 1s and 5s set aside during a turn add up across rolls (1-1, then 1 = three 1s
+--                = 1,000). Resets on hot dice, when all six dice come back.
 ns.RULESETS = {
-  classic = { key = "classic", name = "Classic", minBank = 0, fivesPair = false },
-  mumpits = { key = "mumpits", name = "Mumpits", minBank = 400, fivesPair = true },
+  classic = { key = "classic", name = "Classic", minBank = 0, fivesPair = false, comboAcross = false },
+  mumpits = { key = "mumpits", name = "Mumpits", minBank = 400, fivesPair = true, comboAcross = true },
 }
+
+-- Score of `count` dice showing face 1 or 5, as one set (singles, or a kind)
+function ns.OnesFivesScore(face, count)
+  local R = ns.RULES
+  if count <= 0 then return 0 end
+  if count < 3 then return (face == 1 and R.single1 or R.single5) * count end
+  local base = (face == 1) and R.tripleOnes or 5 * R.tripleFaceMult
+  for _ = 4, count do base = base * 2 end
+  return base
+end
 ns.RULESET_ORDER = { "classic", "mumpits" }
 
 local function counts(dice)

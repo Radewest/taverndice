@@ -33,10 +33,15 @@ Bots.STYLES = {
 Bots.ORDER = { "cautious", "balanced", "reckless" }
 
 -- Pick which dice to set aside. Returns option { idx, score, kept }.
-function Bots.Choose(roll, style, rules)
+function Bots.Choose(roll, style, rules, g)
   local S = Bots.STYLES[style] or Bots.STYLES.balanced
   local best, bestValue
   for _, o in ipairs(ns.ScoringOptions(roll, rules)) do
+    if g then  -- Mumpits: what these dice really add, counting 1s / 5s already set aside
+      local vals = {}
+      for _, i in ipairs(o.idx) do vals[#vals + 1] = roll[i] end
+      o.score = g:GainFor(vals)
+    end
     local left = #roll - o.kept
     if left == 0 then left = 6 end  -- hot dice
     local value = o.score + S.keepBonus * left
@@ -76,7 +81,7 @@ function Bots.Step(g)
   if g.phase == "ready" then
     g:Roll()
   elseif g.phase == "choosing" then
-    local o = Bots.Choose(g.roll, p.bot, g.rules)
+    local o = Bots.Choose(g.roll, p.bot, g.rules, g)
     if not o then return end
     g:SetSelection(o.idx, o.fiveBack)
     local total = g.turnScore + o.score
