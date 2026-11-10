@@ -153,7 +153,7 @@ check(ns.cdb.stats.games == before + 150, "games are counted in your stats")
 print("Mumpits")
 local M = ns.RULESETS.mumpits
 local s5, ok5, ref5 = ns.ScoreSelection({5, 5}, M)
-check(s5 == 100 and ok5 and ref5 == 1, "two 5s = 100 and one goes back")
+check(s5 == 100 and ok5 and ref5 == 1, "two 5s = 100 and one may go back")
 check(select(3, ns.ScoreSelection({5, 5})) == 0, "classic has no 5 refund")
 check(select(3, ns.ScoreSelection({5, 5, 5}, M)) == 0, "three 5s are a triple, no refund")
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({5, 5, 2, 3, 4, 6})[i] end; cb(t, "local") end
@@ -169,6 +169,29 @@ gm:Bank()
 gm.players[1].onBoard = true
 check(gm.players[1].score == 1100, "Mumpits bank recorded")
 gm:Abandon(); timers = {}
+-- last two dice are 5, 5: automatically keep both = hot dice; the player can choose otherwise
+gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpits" })
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 1, 2, 5, 5})[i] end; cb(t, "local") end
+gm:Roll(); gm:SetSelection({1, 2, 3})
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = 5 end; cb(t, "local") end
+gm:Roll()
+check(gm.remaining == 3 and #gm.roll == 3, "three dice left")
+gm.roll = {5, 5}; gm.remaining = 2; gm.phase = "choosing"
+gm:SetSelection({1, 2})
+check(gm:NextRollCount() == 6, "last two dice are 5-5: hot dice by default")
+gm:SetFiveBack(true)
+check(gm:NextRollCount() == 1, "or throw one 5 back and roll it")
+gm:SetFiveBack(false)
+check(gm:NextRollCount() == 6, "and back to keeping both")
+gm.roll = {5, 5, 3}; gm.remaining = 3
+gm:SetSelection({1, 2})
+check(gm:NextRollCount() == 2, "with dice to spare, one 5 goes back by default")
+gm:SetFiveBack(false)
+check(gm:NextRollCount() == 1, "keeping both 5s leaves one die")
+gm:Abandon(); timers = {}
+local opts = ns.ScoringOptions({5, 5}, M)
+check(#opts == 4, "bots see both choices for a pair of 5s")
+D.Roll = realRoll
 D.Roll = realRoll
 local okM = true
 for i = 1, 60 do
@@ -195,11 +218,11 @@ check(ng and ng.net == "Bob-Realm" and ng.players[1].name == "Harry" and ng.play
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 1, 2, 3, 4})[i] end; cb(t, "local") end
 sent = {}
 ng:Roll()
-check(sent[1] == "A~" .. invId .. "~1~~r" and sent[2] == "R~" .. invId .. "~1~111234~local~", "our roll is sent to the friend")
+check(sent[1] == "A~" .. invId .. "~1~~r~" and sent[2] == "R~" .. invId .. "~1~111234~local~", "our roll is sent to the friend")
 ng:Toggle(1); ng:Toggle(2); ng:Toggle(3)
-check(sent[#sent] == "T~" .. invId .. "~1~123", "our selection is shared live")
+check(sent[#sent] == "T~" .. invId .. "~1~123~", "our selection is shared live")
 ng:Bank()
-check(sent[#sent] == "A~" .. invId .. "~1~123~b" and ng.current == 2, "our bank is sent, then it's their turn")
+check(sent[#sent] == "A~" .. invId .. "~1~123~b~" and ng.current == 2, "our bank is sent, then it's their turn")
 check(not ng:IsMyTurn(), "we can't act on the friend's turn")
 sent = {}
 from("A~" .. invId .. "~2~~r")

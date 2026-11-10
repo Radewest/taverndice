@@ -253,6 +253,18 @@ local function build()
   f.hint:SetPoint("TOP", f.turnText, "BOTTOM", 0, -6)
   f.hint:SetWidth(330)
 
+  -- Mumpits: a pair of 5s can stay, or one goes back in the cup
+  f.fiveBtn = button(felt, "", 190, 20)
+  f.fiveBtn:SetPoint("TOP", f.hint, "BOTTOM", 0, -6)
+  f.fiveBtn:SetScript("OnClick", function()
+    local g = ns.game
+    if g and g:IsMyTurn() then
+      local _, _, _, back = g:SelectionScore()
+      g:SetFiveBack(back == 0)
+    end
+  end)
+  f.fiveBtn:Hide()
+
   f.rollBtn = button(felt, "Roll", 140, 28)
   f.rollBtn:SetPoint("BOTTOMRIGHT", felt, "BOTTOM", -6, 14)
   f.rollBtn:SetScript("OnClick", clicked(function() if ns.game and ns.game:IsMyTurn() then ns.game:Roll() end end))
@@ -629,7 +641,12 @@ refresh = function(f)
   -- Turn text, hint, buttons
   local p = g:Player()
   local mine = g:IsMyTurn()
-  local selScore, selOk, selN, refund = g:SelectionScore()
+  local selScore, selOk, selN, refund, canBack = g:SelectionScore()
+  local showFive = mine and g.phase == "choosing" and selOk and (canBack or 0) > 0 and not f.animating
+  f.fiveBtn:SetShown(showFive and true or false)
+  if showFive then
+    f.fiveBtn:SetText((refund or 0) > 0 and "Keep both 5s instead" or "Throw one 5 back instead")
+  end
   if g.phase == "over" then
     local w = g.winner
     f.turnText:SetText(w and (isYou(w) and "|cff66dd66You win!|r" or (nameColored(w) .. " wins!")) or "The table is empty.")
@@ -647,8 +664,9 @@ refresh = function(f)
       f.hint:SetText("Roll the dice.")
     elseif g.phase == "rolling" then
       f.hint:SetText("Waiting for the server's roll...")
-    elseif selOk and (refund or 0) > 0 then
-      f.hint:SetText("Two 5s make 100, and one of them goes back in the cup.")
+    elseif selOk and (canBack or 0) > 0 then
+      f.hint:SetText((refund or 0) > 0 and "Two 5s make 100. One 5 goes back in the cup to roll again."
+        or "Two 5s make 100. Keeping both.")
     elseif g.minBank > 0 and g:PendingTotal() < g.minBank then
       f.hint:SetText(string.format("You need %s this turn before you can bank.", fmt(g.minBank)))
     elseif not p.onBoard and g.opening > 0 and g:PendingTotal() < g.opening then

@@ -1,5 +1,10 @@
 # Tavern Dice changelog
 
+## v0.2.3 (2026-11-10)
+- Mumpits: a pair of 5s is now your choice. Keep both, or throw one back in the cup to roll again (both score 100). A button under the hint switches between them.
+- If your last two dice are 5-5, keeping both is the default, so it's **hot dice** instead of rolling one die.
+- The regulars weigh both options too.
+
 ## v0.2.2 (2026-11-10)
 - First release published automatically to CurseForge. No gameplay changes since v0.2.1.
 

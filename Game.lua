@@ -89,24 +89,47 @@ function Game:SelectedValues()
   return vals
 end
 
--- Returns score, valid, dice used (dice that leave the cup; Mumpits gives one 5 back)
+-- Mumpits: with a pair of 5s selected, does one go back in the cup?
+-- self.fiveBack: true / false when the player chose, nil = automatic: throw one back,
+-- unless keeping both uses every die left (then it's hot dice, which is better).
+function Game:FiveBackActive(nVals, can)
+  if not can or can == 0 then return false end
+  if self.fiveBack ~= nil then return self.fiveBack end
+  return nVals < self.remaining
+end
+
+local function fbWire(v) if v == nil then return "" end return v and "1" or "0" end
+local function fbParse(s) if s == "1" then return true elseif s == "0" then return false end return nil end
+
+-- Returns score, valid, dice used (that leave the cup), dice thrown back, canThrowBack
 function Game:SelectionScore()
   local vals = self:SelectedValues()
-  if #vals == 0 then return 0, false, 0 end
-  local s, ok, refund = ns.ScoreSelection(vals, self.rules)
-  return s, ok, #vals - (refund or 0), refund or 0
+  if #vals == 0 then return 0, false, 0, 0, 0 end
+  local s, ok, can = ns.ScoreSelection(vals, self.rules)
+  local back = (ok and self:FiveBackActive(#vals, can)) and 1 or 0
+  return s, ok, #vals - back, back, can or 0
 end
 
 function Game:Toggle(i)
   if self.phase ~= "choosing" or not self.roll[i] then return end
   self.selected[i] = not self.selected[i] or nil
-  netSend(self, "T", self.turnNo, self:SelectionString())
+  self.fiveBack = nil
+  netSend(self, "T", self.turnNo, self:SelectionString(), "")
   ns:Fire("TD_UPDATE")
 end
 
-function Game:SetSelection(idxList)
+-- Keep both 5s (false) or throw one back (true)
+function Game:SetFiveBack(v)
+  if self.phase ~= "choosing" then return end
+  self.fiveBack = v and true or false
+  netSend(self, "T", self.turnNo, self:SelectionString(), fbWire(self.fiveBack))
+  ns:Fire("TD_UPDATE")
+end
+
+function Game:SetSelection(idxList, fiveBack)
   self.selected = {}
   for _, i in ipairs(idxList) do self.selected[i] = true end
+  self.fiveBack = fiveBack
   ns:Fire("TD_UPDATE")
 end
 
@@ -148,7 +171,7 @@ end
 ---------------------------------------------------------------------------
 function Game:Roll()
   if not self:CanRoll() then return false end
-  netSend(self, "A", self.turnNo, self:SelectionString(), "r")
+  netSend(self, "A", self.turnNo, self:SelectionString(), "r", fbWire(self.fiveBack))
   if self.phase == "choosing" then
     local s, _, n, refund = self:SelectionScore()
     self.turnScore = self.turnScore + s
@@ -165,7 +188,7 @@ function Game:Roll()
     end
   end
   self.phase = "rolling"
-  self.roll, self.selected = {}, {}
+  self.roll, self.selected, self.fiveBack = {}, {}, nil
   ns:Fire("TD_EVENT", "ROLLING", self:Player(), self.remaining)
   ns:Fire("TD_UPDATE")
   -- A friend's seat: their client rolls and sends us the dice (Comms -> RemoteRolled)
@@ -208,7 +231,7 @@ end
 
 function Game:Bank()
   if not self:CanBank() then return false end
-  netSend(self, "A", self.turnNo, self:SelectionString(), "b")
+  netSend(self, "A", self.turnNo, self:SelectionString(), "b", fbWire(self.fiveBack))
   local p = self:Player()
   local total = self:PendingTotal()
   p.score = p.score + total
@@ -278,14 +301,18 @@ function Game:CatchUp(turn)
   return turn == self.turnNo and self:Player().remote and self.phase ~= "over"
 end
 
-function Game:RemoteSelect(turn, idx)
+function Game:RemoteSelect(turn, idx, fb)
   if not self:CatchUp(turn) or self.phase ~= "choosing" then return end
-  self:SetSelection(parseIdx(idx))
+  self:SetSelection(parseIdx(idx), fbParse(fb))
 end
 
-function Game:RemoteAction(turn, idx, act)
+function Game:RemoteAction(turn, idx, act, fb)
   if not self:CatchUp(turn) then return false end
-  if self.phase == "choosing" then self.selected = {}; for _, i in ipairs(parseIdx(idx)) do self.selected[i] = true end end
+  if self.phase == "choosing" then
+    self.selected = {}
+    for _, i in ipairs(parseIdx(idx)) do self.selected[i] = true end
+    self.fiveBack = fbParse(fb)
+  end
   local ok
   if act == "b" then ok = self:Bank() else ok = self:Roll() end
   if not ok then ns:Fire("TD_EVENT", "DESYNC", self:Player()) end

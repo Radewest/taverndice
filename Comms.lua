@@ -11,8 +11,9 @@
 --   INV~version~gameId~ruleset~target~opening~server     invitation
 --   ACC~gameId~version                                   accepted
 --   DEC~gameId                                           declined
---   T~gameId~turn~selection                              live selection ("135" = dice 1, 3, 5)
---   A~gameId~turn~selection~act                          act: r = roll on, b = bank
+--   T~gameId~turn~selection~fiveBack                     live selection ("135" = dice 1, 3, 5)
+--   A~gameId~turn~selection~act~fiveBack                 act: r = roll on, b = bank
+--                                                        fiveBack (v0.2.3+): 1 / 0 / empty = automatic
 --   R~gameId~turn~dice~source~raw                        my roll ("251346"); raw = the /roll value
 --   Q~gameId                                             I left the table
 
@@ -258,14 +259,14 @@ local function liveGame(from, id)
   if g and g.net and g.netId == id and same(g.net, from) and g.phase ~= "over" then return g end
 end
 
-handlers.T = function(from, id, turn, sel)
+handlers.T = function(from, id, turn, sel, fb)
   local g = liveGame(from, id)
-  if g then g:RemoteSelect(turn, sel) end
+  if g then g:RemoteSelect(turn, sel, fb) end
 end
 
-handlers.A = function(from, id, turn, sel, act)
+handlers.A = function(from, id, turn, sel, act, fb)
   local g = liveGame(from, id)
-  if g then g:RemoteAction(turn, sel, act) end
+  if g then g:RemoteAction(turn, sel, act, fb) end
 end
 
 local warnedUnseen = {}

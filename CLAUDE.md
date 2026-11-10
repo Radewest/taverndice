@@ -5,7 +5,7 @@
 ## What it is
 A WoW Forever add-on for playing 10,000 (Farkle / Dix Mille / Zilch / Greed) at the tavern table. v0.1 is solo against bots; v0.2 adds games with friends. Tone: tavern / fantasy roleplay (Harry plays a roleplaying gnome mage). **No** South African flavour in this one.
 - **Owner:** Harry. **Licence:** MIT. **CurseForge project ID:** 1795741. **GitHub:** Radewest/taverndice (source of truth).
-- **Current version:** v0.2.2 (first automated release)
+- **Current version:** v0.2.3
 - **Slash:** `/dice` (also `/taverndice`). Saved variables `TavernDiceDB`, `TavernDiceCharDB`.
 
 ## Architecture
@@ -29,7 +29,7 @@ A WoW Forever add-on for playing 10,000 (Farkle / Dix Mille / Zilch / Greed) at 
 - **Server dice via one /roll per throw.** Add-on RNG can be edited, so multiplayer needs dice nobody controls. `/roll 0-46655` (6^6 - 1) gives six fair dice in one chat line; fewer dice use 6^n - 1. Every player's add-on reads the same system message, so v0.2 multiplayer can verify each other's rolls. Solo defaults to local dice so we don't spam people nearby.
 - **Not yet verified in Forever:** that `RandomRoll` is callable by add-ons and that roll lines reach `CHAT_MSG_SYSTEM` in the `RANDOM_ROLL_RESULT` format. The timeout fallback covers a failure, but test `/dice server` in game early.
 - **Four+ of a kind doubles** (classic Dix Mille) rather than fixed 1000/2000/3000. Three pairs 1000, straight 1500. All numbers live in `ns.RULES` for future house-rule toggles.
-- **Rulesets** (`ns.RULESETS` in Scoring.lua, chosen in the lobby, stored on the game as `g.rules`): **Classic**, and Harry's house rules **Mumpits**: never bank under 400 in a turn (`minBank`), and two 5s score 100 with one 5 returned to the cup (`fivesPair`; `ScoreSelection` returns a third value `refund`). The opening minimum is separate and only applies to your first bank.
+- **Rulesets** (`ns.RULESETS` in Scoring.lua, chosen in the lobby, stored on the game as `g.rules`): **Classic**, and Harry's house rules **Mumpits**: never bank under 400 in a turn (`minBank`), and two 5s score 100; the player chooses to keep both or throw one back to reroll (`fivesPair`; `ScoreSelection` returns a third value `canThrowBack`; `Game.fiveBack` true/false/nil, nil = automatic: throw one back unless keeping both would be hot dice). Sent as the last field of T and A. The opening minimum is separate and only applies to your first bank.
 - **Friend games are lockstep, not host-authoritative.** Both clients run the same Game; each plays its own seat and sends A (roll on / bank, with the selection), R (the dice) and T (live selection). Every message carries the turn number. A next-turn message during our Farkle pause ends the pause first (`Game:CatchUp`). Seat 1 = the inviter. Settings come from the inviter's INV.
 - **Dice trust in friend games:** each client rolls its own dice. With server dice on, R includes the raw /roll value; the receiver refuses dice that don't decode from it, and if grouped it checks the /roll line it saw (`Dice.WasSeen`). Far apart and not grouped, the system message isn't visible, so it's trust between friends.
 - **Table talk and protected chat:** /say outdoors needs a hardware event, so Talk only uses SAY inside your own click; async moments (server roll results, a friend's last turn ending the game) use EMOTE / DoEmote.

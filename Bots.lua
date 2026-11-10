@@ -78,7 +78,7 @@ function Bots.Step(g)
   elseif g.phase == "choosing" then
     local o = Bots.Choose(g.roll, p.bot, g.rules)
     if not o then return end
-    g:SetSelection(o.idx)
+    g:SetSelection(o.idx, o.fiveBack)
     local total = g.turnScore + o.score
     local left = g.remaining - o.kept
     if Bots.ShouldBank(g, total, left, p.bot) and g:CanBank() then

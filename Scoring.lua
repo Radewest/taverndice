@@ -35,8 +35,9 @@ end
 ns.CountDice = counts
 
 -- Score a set of dice the player wants to set aside.
--- Returns score, valid, refund. valid = every die in the set contributes to the score.
--- refund = how many of these dice go back into the cup (Mumpits: one of a pair of 5s).
+-- Returns score, valid, canThrowBack. valid = every die in the set contributes to the score.
+-- canThrowBack = 1 when the player may put one of a pair of 5s back in the cup (Mumpits);
+-- the score is 100 either way, so it's the player's choice (Game.fiveBack).
 function ns.ScoreSelection(dice, rules)
   local R = ns.RULES
   local n = #dice
@@ -93,8 +94,11 @@ function ns.ScoringOptions(roll, rules)
         vals[#vals + 1] = roll[i]
       end
     end
-    local s, ok, refund = ns.ScoreSelection(vals, rules)
-    if ok and s > 0 then opts[#opts + 1] = { idx = idx, score = s, kept = #idx - refund } end
+    local s, ok, can = ns.ScoreSelection(vals, rules)
+    if ok and s > 0 then
+      opts[#opts + 1] = { idx = idx, score = s, kept = #idx, fiveBack = (can > 0) and false or nil }
+      if can > 0 then opts[#opts + 1] = { idx = idx, score = s, kept = #idx - 1, fiveBack = true } end
+    end
   end
   return opts
 end

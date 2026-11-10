@@ -5,7 +5,7 @@
 local ADDON, ns = ...
 _G.TavernDice = ns -- handy for /dump TavernDice while developing
 
-ns.VERSION = "0.2.2"   -- keep in sync with ## Version in both TOCs
+ns.VERSION = "0.2.3"   -- keep in sync with ## Version in both TOCs
 
 ---------------------------------------------------------------------------
 -- API shims (Forever runs the modern Midnight-era client; keep fallbacks anyway)
