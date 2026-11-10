@@ -5,7 +5,7 @@
 local ADDON, ns = ...
 _G.TavernDice = ns -- handy for /dump TavernDice while developing
 
-ns.VERSION = "0.2.4"   -- keep in sync with ## Version in both TOCs
+ns.VERSION = "0.2.5"   -- keep in sync with ## Version in both TOCs
 
 ---------------------------------------------------------------------------
 -- API shims (Forever runs the modern Midnight-era client; keep fallbacks anyway)
@@ -90,7 +90,7 @@ local DEFAULTS = {
   chat = "important",   -- "off" | "important" | "all"
   target = 10000,       -- points to win
   opening = 500,        -- points needed in one turn to get "on the board" (first bank only)
-  ruleset = "classic",  -- "classic" | "mumpits" (Scoring.lua RULESETS)
+  ruleset = "classic",  -- "classic" | "mumpets" (Scoring.lua RULESETS)
   opponents = { "balanced" },  -- bot styles (Bots.lua), 1-3 of them
   server = false,       -- use real /roll dice (needed for fair multiplayer; optional solo)
   hideRollLines = true, -- hide our own /roll lines from chat
@@ -123,6 +123,7 @@ ns:On("ADDON_LOADED", function(name)
   applyDefaults(TavernDiceDB, DEFAULTS)
   applyDefaults(TavernDiceCharDB, CHAR_DEFAULTS)
   ns.db, ns.cdb = TavernDiceDB, TavernDiceCharDB
+  if ns.db.ruleset == "mumpits" then ns.db.ruleset = "mumpets" end   -- renamed in v0.2.5
   ns:Fire("DB_READY")
 end)
 

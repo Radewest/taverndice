@@ -35,7 +35,7 @@ function ns:NewGame(opts)
   end
   g.target = opts.target or 10000
   g.opening = opts.opening or 500
-  g.rules = ns.RULESETS[opts.ruleset or "classic"] or ns.RULESETS.classic
+  g.rules = ns.RULESETS[opts.ruleset or "classic"] or ns.RULESETS.classic   -- "mumpits" maps to Mumpets
   g.minBank = g.rules.minBank or 0
   g.server = opts.server and true or false
   g.net, g.netId = opts.net, opts.netId
@@ -72,7 +72,6 @@ function Game:StartTurn(idx)
   self.turnScore = 0
   self.remaining = 6
   self.kept = {}
-  self.combo = { [1] = 0, [5] = 0 }   -- 1s and 5s set aside since the last full cup (Mumpits)
   self.roll = {}
   self.selected = {}
   self.phase = "ready"
@@ -90,7 +89,7 @@ function Game:SelectedValues()
   return vals
 end
 
--- Mumpits: with a pair of 5s selected, does one go back in the cup?
+-- Mumpets: with a pair of 5s selected, does one go back in the cup?
 -- self.fiveBack: true / false when the player chose, nil = automatic: throw one back,
 -- unless keeping both uses every die left (then it's hot dice, which is better).
 function Game:FiveBackActive(nVals, can)
@@ -102,27 +101,9 @@ end
 local function fbWire(v) if v == nil then return "" end return v and "1" or "0" end
 local function fbParse(s) if s == "1" then return true elseif s == "0" then return false end return nil end
 
--- Points these dice add to the turn. In Mumpits, 1s and 5s already set aside count with them
--- (two 1s earlier + one 1 now = three 1s = 1,000, so this 1 adds 800).
--- Returns score, valid, canThrowBack
+-- Points these dice add to the turn (every roll scores on its own). Returns score, valid, canThrowBack
 function Game:GainFor(vals)
-  local s, ok, can = ns.ScoreSelection(vals, self.rules)
-  if not ok or not (self.rules and self.rules.comboAcross) then return s, ok, can end
-  local combo = self.combo or { [1] = 0, [5] = 0 }
-  if combo[1] + combo[5] == 0 then return s, ok, can end
-  local rest, c1, c5 = {}, 0, 0
-  for _, v in ipairs(vals) do
-    if v == 1 then c1 = c1 + 1 elseif v == 5 then c5 = c5 + 1 else rest[#rest + 1] = v end
-  end
-  local gain = 0
-  if #rest > 0 then
-    local rs, rok = ns.ScoreSelection(rest, self.rules)
-    if not rok then return 0, false, can end
-    gain = rs
-  end
-  gain = gain + ns.OnesFivesScore(1, combo[1] + c1) - ns.OnesFivesScore(1, combo[1])
-              + ns.OnesFivesScore(5, combo[5] + c5) - ns.OnesFivesScore(5, combo[5])
-  return gain, ok, can
+  return ns.ScoreSelection(vals, self.rules)
 end
 
 -- Returns score, valid, dice used (that leave the cup), dice thrown back, canThrowBack
@@ -200,17 +181,23 @@ function Game:Roll()
     local s, _, n, refund = self:SelectionScore()
     self.turnScore = self.turnScore + s
     local skip5 = refund > 0
-    self.combo = self.combo or { [1] = 0, [5] = 0 }
     for _, v in ipairs(self:SelectedValues()) do
-      if v == 1 or v == 5 then self.combo[v] = self.combo[v] + 1 end   -- a thrown-back 5 still counted
-      if skip5 and v == 5 then skip5 = false else self.kept[#self.kept + 1] = v end
+      -- a pair of 5s "made a 1": one 5 goes back, and the tray shows the 1 it became
+      if skip5 and v == 5 then
+        skip5 = false
+      elseif refund > 0 and v == 5 and not self._shownOne then
+        self.kept[#self.kept + 1] = 1
+        self._shownOne = true
+      else
+        self.kept[#self.kept + 1] = v
+      end
     end
+    self._shownOne = nil
     if refund > 0 then ns:Fire("TD_EVENT", "FIVEBACK", self:Player()) end
     self.remaining = self.remaining - n
     if self.remaining == 0 then
       self.remaining = 6
       self.kept = {}
-      self.combo = { [1] = 0, [5] = 0 }
       ns:Fire("TD_EVENT", "HOTDICE", self:Player(), self.turnScore)
     end
   end
@@ -229,7 +216,91 @@ function Game:Roll()
   return true
 end
 
+-- Farkle-style pause, then the next player's turn
+function Game:PauseThenEnd()
+  local myId, myTurn = self.id, self.turnNo
+  local pause = self.net and FARKLE_PAUSE or FARKLE_PAUSE * (ns.db and ns.db.speed or 1)
+  after(pause, function()
+    if ns.game == self and self.id == myId and self.turnNo == myTurn and self.phase == "farkle" then
+      self:EndTurn()
+    end
+  end)
+end
+
+---------------------------------------------------------------------------
+-- Mumpets straight chase: six dice showing five different numbers -> reroll the spare die
+-- for the missing number. Returns missing number, index of the spare die (nil = not possible).
+---------------------------------------------------------------------------
+function Game:ChaseInfo()
+  if not (self.rules and self.rules.straightChase) or self.phase ~= "choosing" or #self.roll ~= 6 then return nil end
+  local c = ns.CountDice(self.roll)
+  local missing, dupe
+  for f = 1, 6 do
+    if c[f] == 0 then
+      if missing then return nil end
+      missing = f
+    elseif c[f] == 2 then
+      if dupe then return nil end
+      dupe = f
+    elseif c[f] > 2 then
+      return nil
+    end
+  end
+  if not (missing and dupe) then return nil end
+  for i = 6, 1, -1 do
+    if self.roll[i] == dupe then return missing, i end
+  end
+end
+
+function Game:Chase()
+  local missing, idx = self:ChaseInfo()
+  if not missing then return false end
+  netSend(self, "A", self.turnNo, "", "c", "")
+  self.chase = { missing = missing, idx = idx, base = self.roll }
+  self.phase = "rolling"
+  self.selected, self.fiveBack = {}, nil
+  ns:Fire("TD_EVENT", "CHASE", self:Player(), missing)
+  ns:Fire("TD_EVENT", "ROLLING", self:Player(), 1, idx)
+  ns:Fire("TD_UPDATE")
+  if self:Player().remote then return true end
+  local myId, myTurn = self.id, self.turnNo
+  ns.Dice.Roll(1, function(dice, source, raw)
+    if ns.game ~= self or self.id ~= myId or self.turnNo ~= myTurn or self.phase ~= "rolling" then return end
+    netSend(self, "R", self.turnNo, table.concat(dice), source, raw or "")
+    self:OnRolled(dice, source)
+  end, self.server)
+  return true
+end
+
+function Game:OnChaseRolled(die)
+  local ch = self.chase
+  self.chase = nil
+  local full = {}
+  for i, v in ipairs(ch.base) do full[i] = v end
+  full[ch.idx] = die
+  self.roll = full
+  local p = self:Player()
+  if die == ch.missing then
+    -- the straight: all six are selected; bank it or roll on with hot dice
+    self.selected = { true, true, true, true, true, true }
+    self.phase = "choosing"
+    ns:Fire("TD_EVENT", "STRAIGHT", p, ns.ScoreSelection(full, self.rules))
+    ns:Fire("TD_UPDATE")
+    self:Kick()
+  else
+    local lost = self.turnScore
+    local penalty = self.rules.chasePenalty or 500
+    p.score = p.score - penalty
+    self.turnScore = 0
+    self.phase = "farkle"
+    ns:Fire("TD_EVENT", "CHASEMISS", p, lost, die, ch.missing, penalty)
+    ns:Fire("TD_UPDATE")
+    self:PauseThenEnd()
+  end
+end
+
 function Game:OnRolled(dice, source)
+  if self.chase then return self:OnChaseRolled(dice[1]) end
   self.roll = dice
   self.rollSource = source
   self.selected = {}
@@ -241,13 +312,7 @@ function Game:OnRolled(dice, source)
     self.phase = "farkle"
     ns:Fire("TD_EVENT", "FARKLE", p, lost, dice)
     ns:Fire("TD_UPDATE")
-    local myId, myTurn = self.id, self.turnNo
-    local pause = self.net and FARKLE_PAUSE or FARKLE_PAUSE * (ns.db and ns.db.speed or 1)
-    after(pause, function()
-      if ns.game == self and self.id == myId and self.turnNo == myTurn and self.phase == "farkle" then
-        self:EndTurn()
-      end
-    end)
+    self:PauseThenEnd()
     return
   end
   self.phase = "choosing"
@@ -341,7 +406,7 @@ function Game:RemoteAction(turn, idx, act, fb)
     self.fiveBack = fbParse(fb)
   end
   local ok
-  if act == "b" then ok = self:Bank() else ok = self:Roll() end
+  if act == "b" then ok = self:Bank() elseif act == "c" then ok = self:Chase() else ok = self:Roll() end
   if not ok then ns:Fire("TD_EVENT", "DESYNC", self:Player()) end
   return ok
 end
@@ -349,7 +414,7 @@ end
 function Game:RemoteRolled(turn, digits, source, raw)
   if not self:CatchUp(turn) or self.phase ~= "rolling" then return false end
   local dice = parseIdx(digits)
-  if #dice ~= self.remaining then ns:Fire("TD_EVENT", "DESYNC", self:Player()); return false end
+  if #dice ~= (self.chase and 1 or self.remaining) then ns:Fire("TD_EVENT", "DESYNC", self:Player()); return false end
   for _, v in ipairs(dice) do if v < 1 or v > 6 then return false end end
   self.lastRemoteRaw = tonumber(raw)
   self:OnRolled(dice, source)

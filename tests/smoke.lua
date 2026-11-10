@@ -151,13 +151,13 @@ print(string.format("     wins: cautious %d, balanced %d, reckless %d; avg %.0f 
 check(ns.cdb.stats.games == before + 150, "games are counted in your stats")
 
 print("Mumpits")
-local M = ns.RULESETS.mumpits
+local M = ns.RULESETS.mumpets
 local s5, ok5, ref5 = ns.ScoreSelection({5, 5}, M)
 check(s5 == 100 and ok5 and ref5 == 1, "two 5s = 100 and one may go back")
 check(select(3, ns.ScoreSelection({5, 5})) == 0, "classic has no 5 refund")
 check(select(3, ns.ScoreSelection({5, 5, 5}, M)) == 0, "three 5s are a triple, no refund")
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({5, 5, 2, 3, 4, 6})[i] end; cb(t, "local") end
-local gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpits" })
+local gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpets" })
 gm:Roll(); gm:SetSelection({1, 2})
 check(gm:NextRollCount() == 5 and not gm:CanBank(), "5-5 leaves 5 dice to roll; 100 is under 400 so no bank")
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 1, 2, 3})[i] end; cb(t, "local") end
@@ -170,7 +170,7 @@ gm.players[1].onBoard = true
 check(gm.players[1].score == 1100, "Mumpits bank recorded")
 gm:Abandon(); timers = {}
 -- last two dice are 5, 5: automatically keep both = hot dice; the player can choose otherwise
-gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpits" })
+gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpets" })
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 1, 2, 5, 5})[i] end; cb(t, "local") end
 gm:Roll(); gm:SetSelection({1, 2, 3})
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = 5 end; cb(t, "local") end
@@ -189,24 +189,58 @@ check(gm:NextRollCount() == 2, "with dice to spare, one 5 goes back by default")
 gm:SetFiveBack(false)
 check(gm:NextRollCount() == 1, "keeping both 5s leaves one die")
 gm:Abandon(); timers = {}
--- 1s and 5s add up across rolls in Mumpits
-gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpits" })
+-- Harry's example: 5-5 made a 1 (100), roll five: 4-4-4-5-5 keeps both 5s = hot dice, 600
+gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpets" })
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({5, 5, 2, 3, 4, 6})[i] end; cb(t, "local") end
+gm:Roll(); gm:SetSelection({1, 2})
+check(gm:NextRollCount() == 5, "5-5 made a 1: roll five dice")
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({4, 4, 4, 5, 5})[i] end; cb(t, "local") end
+gm:Roll()
+check(#gm.kept == 1 and gm.kept[1] == 1, "the tray shows the 1 the pair became")
+gm:SetSelection({1, 2, 3, 4, 5})
+check(gm:PendingTotal() == 600 and gm:NextRollCount() == 6, "4-4-4-5-5 keeps both 5s: hot dice, 600")
+gm:Roll()
+check(gm.remaining == 6 and gm.turnScore == 600, "and you go again with six")
+gm:Abandon(); timers = {}
+-- every roll scores on its own (no adding up across rolls)
+gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpets" })
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 2, 3, 4, 6})[i] end; cb(t, "local") end
 gm:Roll(); gm:SetSelection({1, 2})
-check(gm:SelectionScore() == 200, "two 1s = 200")
 D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 2, 3, 4})[i] end; cb(t, "local") end
 gm:Roll(); gm:SetSelection({1})
-check(gm:SelectionScore() == 800 and gm:PendingTotal() == 1000, "then another 1 makes three 1s = 1,000")
-D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 5, 2})[i] end; cb(t, "local") end
-gm:Roll(); gm:SetSelection({1, 2})
-check(gm:PendingTotal() == 2050, "a fourth 1 doubles it (2,000) plus a 5")
+check(gm:PendingTotal() == 300, "1-1 then 1 is 300, not three 1s")
 gm:Abandon(); timers = {}
-local cg = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "classic" })
-D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 2, 3, 4, 6})[i] end; cb(t, "local") end
-cg:Roll(); cg:SetSelection({1, 2})
-D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 2, 3, 4})[i] end; cb(t, "local") end
-cg:Roll(); cg:SetSelection({1})
-check(cg:PendingTotal() == 300, "classic: each roll scores on its own")
+check(ns.RULESETS.mumpits == ns.RULESETS.mumpets and ns.RULESETS.mumpets.name == "Mumpets", "renamed to Mumpets; the old key still works")
+-- Straight chase (Mumpets)
+check(ns.ScoreSelection({1, 2, 3, 4, 5, 6}, M) == 3000 and ns.ScoreSelection({1, 2, 3, 4, 5, 6}) == 1500, "straight: 3,000 in Mumpets, 1,500 in Classic")
+gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpets" })
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 2, 3, 4, 6, 6})[i] end; cb(t, "local") end
+gm:Roll()
+local miss5, spare = gm:ChaseInfo()
+check(miss5 == 5 and spare == 6, "1-2-3-4-6-6: chase a 5 with the spare 6")
+D.Roll = function(n, cb) cb({5}, "local") end
+gm:Chase()
+check(gm.phase == "choosing" and table.concat(gm.roll) == "123465" and gm:PendingTotal() == 3000, "hit: a straight for 3,000, ready to bank")
+check(gm:NextRollCount() == 6, "and it's hot dice if you roll on")
+gm:Bank()
+check(gm.players[1].score == 3000, "banked the straight")
+gm:Abandon(); timers = {}
+gm = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "mumpets" })
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 1, 1, 2, 2, 2})[i] end; cb(t, "local") end
+gm:Roll(); gm:SetSelection({1, 2, 3, 4, 5, 6})
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 2, 3, 4, 6, 6})[i] end; cb(t, "local") end
+gm:Roll()
+check(gm.turnScore == 1200 and gm:ChaseInfo() == 5, "after hot dice (1,200 this turn) a chase is offered again")
+D.Roll = function(n, cb) cb({3}, "local") end
+gm:Chase()
+check(gm.phase == "farkle" and gm.turnScore == 0 and gm.players[1].score == -500, "miss: turn over, 1,200 lost, and 500 off (below zero is allowed)")
+local fn2 = table.remove(timers, 1); fn2()
+check(gm.current == 2, "then the next player")
+gm:Abandon(); timers = {}
+cg = ns:NewGame({ players = { { name = "Harry" }, { name = "Mira", bot = "balanced" } }, target = 10000, opening = 0, ruleset = "classic" })
+D.Roll = function(n, cb) local t = {}; for i = 1, n do t[i] = ({1, 2, 3, 4, 6, 6})[i] end; cb(t, "local") end
+cg:Roll()
+check(cg:ChaseInfo() == nil and not cg:Chase(), "no chase in Classic")
 cg:Abandon(); timers = {}
 local opts = ns.ScoringOptions({5, 5}, M)
 check(#opts == 4, "bots see both choices for a pair of 5s")
@@ -214,7 +248,7 @@ D.Roll = realRoll
 D.Roll = realRoll
 local okM = true
 for i = 1, 60 do
-  local gg = ns:NewGame({ players = { { name = "A", bot = "cautious" }, { name = "B", bot = "reckless" } }, target = 5000, opening = 0, ruleset = "mumpits" })
+  local gg = ns:NewGame({ players = { { name = "A", bot = "cautious" }, { name = "B", bot = "reckless" } }, target = 5000, opening = 0, ruleset = "mumpets" })
   flush(200000)
   if gg.phase ~= "over" or not gg.winner then okM = false end
 end
@@ -275,13 +309,26 @@ sent = {}
 StaticPopupDialogs.TAVERNDICE_INVITE.OnAccept(nil, popups[1].data)
 local gg2 = ns.game
 check(sent[1] == "ACC~g42~" .. ns.VERSION, "accepting tells the host")
-check(gg2 and gg2.players[1].remote and gg2.players[2].name == "Harry" and gg2.rules.key == "mumpits", "guest sits second with the host's rules")
+check(gg2 and gg2.players[1].remote and gg2.players[2].name == "Harry" and gg2.rules.key == "mumpets", "guest sits second with the host's rules")
 check(not gg2:IsMyTurn(), "host goes first")
 from("A~g42~1~~r")
 from("R~g42~1~123456~server~99999")
 check(gg2.phase == "rolling", "a server roll that doesn't match its /roll value is refused")
 gg2:Abandon(); timers = {}
 D.Roll = realRoll
+
+print("Friend game: straight chase")
+local cgm = ns:NewGame({ players = { { name = "Bob", remote = true, full = "Bob-Realm" }, { name = "Harry" } }, target = 10000, opening = 0, ruleset = "mumpets", net = "Bob-Realm", netId = "c1" })
+from("A~c1~1~~r~")
+from("R~c1~1~123466~local~")
+check(cgm:ChaseInfo() == 5, "their roll offers a chase")
+from("A~c1~1~~c~")
+check(cgm.phase == "rolling" and cgm.chase, "their chase waits for one die")
+from("R~c1~1~5~local~")
+check(cgm:PendingTotal() == 3000, "their chase hits: 3,000")
+from("A~c1~1~123456~b~")
+check(cgm.players[1].score == 3000 and cgm.current == 2, "their straight is banked on our side too")
+cgm:Abandon(); timers = {}
 
 print("Table talk")
 chatSent = {}; emotes = {}

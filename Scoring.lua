@@ -20,24 +20,20 @@ ns.RULES = {
 
 -- Rulesets (picked in the new-game panel). Scoring above is shared; these change how a turn plays.
 --   minBank   : you can never bank less than this in one turn
---   fivesPair : two 5s count 100 and the player may put one back in the cup to roll again
---   comboAcross: 1s and 5s set aside during a turn add up across rolls (1-1, then 1 = three 1s
---                = 1,000). Resets on hot dice, when all six dice come back.
+--   fivesPair : two 5s can be "made a 1": they count 100 and one 5 goes back in the cup to roll
+--               again. Or keep both as two 5s (also 100). Every roll scores on its own.
 ns.RULESETS = {
-  classic = { key = "classic", name = "Classic", minBank = 0, fivesPair = false, comboAcross = false },
-  mumpits = { key = "mumpits", name = "Mumpits", minBank = 400, fivesPair = true, comboAcross = true },
+  classic = { key = "classic", name = "Classic", minBank = 0, fivesPair = false },
+  mumpets = { key = "mumpets", name = "Mumpets", minBank = 400, fivesPair = true,
+              straight = 3000, straightChase = true, chasePenalty = 500 },
+--   straight      : what 1-2-3-4-5-6 scores (default ns.RULES.straight, 1,500)
+--   straightChase : with six dice showing five different numbers, you may reroll the spare die
+--                   for the missing one. Hit = the straight. Miss = turn over, lose the turn's
+--                   points and chasePenalty off your score (it can go below 0).
 }
+ns.RULESETS.mumpits = ns.RULESETS.mumpets   -- old name (v0.1.1 - v0.2.4): saved settings and invites
 
--- Score of `count` dice showing face 1 or 5, as one set (singles, or a kind)
-function ns.OnesFivesScore(face, count)
-  local R = ns.RULES
-  if count <= 0 then return 0 end
-  if count < 3 then return (face == 1 and R.single1 or R.single5) * count end
-  local base = (face == 1) and R.tripleOnes or 5 * R.tripleFaceMult
-  for _ = 4, count do base = base * 2 end
-  return base
-end
-ns.RULESET_ORDER = { "classic", "mumpits" }
+ns.RULESET_ORDER = { "classic", "mumpets" }
 
 local function counts(dice)
   local c = { 0, 0, 0, 0, 0, 0 }
@@ -48,7 +44,7 @@ ns.CountDice = counts
 
 -- Score a set of dice the player wants to set aside.
 -- Returns score, valid, canThrowBack. valid = every die in the set contributes to the score.
--- canThrowBack = 1 when the player may put one of a pair of 5s back in the cup (Mumpits);
+-- canThrowBack = 1 when the player may put one of a pair of 5s back in the cup (Mumpets);
 -- the score is 100 either way, so it's the player's choice (Game.fiveBack).
 function ns.ScoreSelection(dice, rules)
   local R = ns.RULES
@@ -64,7 +60,7 @@ function ns.ScoreSelection(dice, rules)
       if c[f] == 1 then ones = ones + 1 end
       if c[f] == 2 then pairs2 = pairs2 + 1 end
     end
-    if ones == 6 then special = R.straight end
+    if ones == 6 then special = (rules and rules.straight) or R.straight end
     if pairs2 == 3 then special = math.max(special, R.threePairs) end
   end
 

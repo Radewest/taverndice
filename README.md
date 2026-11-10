@@ -19,6 +19,8 @@ Copy the `TavernDice` folder to `World of Warcraft\_classic_beta_\Interface\AddO
 
 Score with all six dice and you get **hot dice**: pick them all up and keep rolling.
 
+**Mumpets** house rules: bank at least 400 every turn, two 5s can be "made a 1" (one 5 goes back in the cup), the straight is worth 3,000, and when you're one number short of a straight you can chase it with the spare die (miss and you lose the turn plus 500).
+
 ## Commands
 | Command | What it does |
 |---|---|

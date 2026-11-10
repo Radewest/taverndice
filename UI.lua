@@ -253,7 +253,7 @@ local function build()
   f.hint:SetPoint("TOP", f.turnText, "BOTTOM", 0, -6)
   f.hint:SetWidth(330)
 
-  -- Mumpits: a pair of 5s can stay, or one goes back in the cup
+  -- Mumpets: a pair of 5s can stay, or one goes back in the cup
   f.fiveBtn = button(felt, "", 190, 20)
   f.fiveBtn:SetPoint("TOP", f.hint, "BOTTOM", 0, -6)
   f.fiveBtn:SetScript("OnClick", function()
@@ -264,6 +264,25 @@ local function build()
     end
   end)
   f.fiveBtn:Hide()
+
+  -- Mumpets straight chase: risk the spare die for the missing number
+  f.chaseBtn = button(felt, "Chase the straight!", 150, 20)
+  f.chaseBtn:SetPoint("TOPRIGHT", -10, -8)
+  f.chaseBtn:SetScript("OnClick", clicked(function() if ns.game and ns.game:IsMyTurn() then ns.game:Chase() end end))
+  f.chaseBtn:SetScript("OnEnter", function(self)
+    local g = ns.game
+    local missing = g and g:ChaseInfo()
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:AddLine("Chase the straight", 1, 0.82, 0)
+    if missing then
+      GameTooltip:AddLine("Reroll the spare die and hope for a " .. missing .. ".", 1, 1, 1)
+      GameTooltip:AddLine("Hit (1 in 6): a straight, " .. fmt((g.rules.straight or 3000)) .. ".", 0.4, 0.87, 0.4)
+      GameTooltip:AddLine("Miss: turn over, this turn's points lost, and " .. fmt(g.rules.chasePenalty or 500) .. " off your score.", 1, 0.33, 0.33)
+    end
+    GameTooltip:Show()
+  end)
+  f.chaseBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  f.chaseBtn:Hide()
 
   f.rollBtn = button(felt, "Roll", 140, 28)
   f.rollBtn:SetPoint("BOTTOMRIGHT", felt, "BOTTOM", -6, 14)
@@ -319,9 +338,15 @@ local function build()
         end
       elseif t >= (self.nextFace or 0) then
         self.nextFace = t + 0.06
-        layoutDice(self, self.animCount or 6)
-        for i = 1, (self.animCount or 6) do self.dice[i]:SetFace(math.random(1, 6)); self.dice[i].glow:Hide() end
-        for i = (self.animCount or 6) + 1, 6 do self.dice[i]:Hide() end
+        if self.animOnly then
+          -- straight chase: only the spare die tumbles
+          local d = self.dice[self.animOnly]
+          d:SetFace(math.random(1, 6)); d.glow:Hide()
+        else
+          layoutDice(self, self.animCount or 6)
+          for i = 1, (self.animCount or 6) do self.dice[i]:SetFace(math.random(1, 6)); self.dice[i].glow:Hide() end
+          for i = (self.animCount or 6) + 1, 6 do self.dice[i]:Hide() end
+        end
       end
     end
     local toastF = self.toast
@@ -341,7 +366,7 @@ end
 ---------------------------------------------------------------------------
 local RULES_NOTE = {
   classic = "Classic: 1 = 100, 5 = 50, three of a kind = face x 100 (three 1s = 1,000), straight 1,500, three pairs 1,000.",
-  mumpits = "Mumpits: never bank under 400 in a turn. Two 5s make 100, and one 5 goes back in the cup.",
+  mumpets = "Mumpets: bank 400+ every turn. Two 5s can be made a 1. Straight 3,000, and one short? Chase it, or lose 500.",
 }
 local TALK_NOTE = {
   auto = "Table talk: you /say \"Hot dice!\" and cheer or sigh when your friend is beside you. Quiet when far apart.",
@@ -502,7 +527,7 @@ function ns:BuildLobby(f)
   end
   p.UpdateNotes = updateNotes
 
-  add(at(cycle(p, "Rules", { { "classic", "Classic" }, { "mumpits", "Mumpits" } },
+  add(at(cycle(p, "Rules", { { "classic", "Classic" }, { "mumpets", "Mumpets" } },
     function() return db.ruleset end, function(v) db.ruleset = v end, 250, updateNotes), LX, -272))
   add(at(cycle(p, "Play to", { { 2000, "2,000" }, { 5000, "5,000" }, { 10000, "10,000" } },
     function() return db.target end, function(v) db.target = v end, 250), LX, -298))
@@ -642,10 +667,19 @@ refresh = function(f)
   local p = g:Player()
   local mine = g:IsMyTurn()
   local selScore, selOk, selN, refund, canBack = g:SelectionScore()
+  local chaseFor, chaseIdx = g:ChaseInfo()
+  local showChase = mine and chaseFor and not f.animating
+  f.chaseBtn:SetShown(showChase and true or false)
+  if not f.animating then
+    for i = 1, 6 do
+      local d = f.dice[i]
+      if chaseFor and i == chaseIdx and not g.selected[i] then d.tex:SetVertexColor(1, 0.9, 0.55) else d.tex:SetVertexColor(1, 1, 1) end
+    end
+  end
   local showFive = mine and g.phase == "choosing" and selOk and (canBack or 0) > 0 and not f.animating
   f.fiveBtn:SetShown(showFive and true or false)
   if showFive then
-    f.fiveBtn:SetText((refund or 0) > 0 and "Keep both 5s instead" or "Throw one 5 back instead")
+    f.fiveBtn:SetText((refund or 0) > 0 and "Keep both 5s instead" or "Make it a 1 instead")
   end
   if g.phase == "over" then
     local w = g.winner
@@ -662,11 +696,15 @@ refresh = function(f)
     f.turnText:SetText(line)
     if g.phase == "ready" then
       f.hint:SetText("Roll the dice.")
+    elseif g.chase then
+      f.hint:SetText("Come on, " .. g.chase.missing .. "...")
+    elseif chaseFor and selN == 0 then
+      f.hint:SetText("One " .. chaseFor .. " short of a straight! Chase it, or play it safe.")
     elseif g.phase == "rolling" then
       f.hint:SetText("Waiting for the server's roll...")
     elseif selOk and (canBack or 0) > 0 then
-      f.hint:SetText((refund or 0) > 0 and "Two 5s make 100. One 5 goes back in the cup to roll again."
-        or "Two 5s make 100. Keeping both.")
+      f.hint:SetText((refund or 0) > 0 and "Two 5s made a 1 (100). One 5 goes back in the cup."
+        or "Keeping both 5s (100).")
     elseif g.minBank > 0 and g:PendingTotal() < g.minBank then
       f.hint:SetText(string.format("You need %s this turn before you can bank.", fmt(g.minBank)))
     elseif not p.onBoard and g.opening > 0 and g:PendingTotal() < g.opening then
@@ -726,13 +764,18 @@ ns:Listen("TD_LOG_RESET", function()
   if frame then frame.log:Clear() end
 end)
 
-ns:Listen("TD_EVENT", function(kind, a, b)
+ns:Listen("TD_EVENT", function(kind, a, b, c)
   if not frame then return end
   if kind == "ROLLING" then
     frame.animating = frame:IsShown()
-    frame.animUntil = now() + 0.45
+    frame.animUntil = now() + (c and 0.9 or 0.45)   -- the chase gets a longer, tenser tumble
     frame.animCount = b or 6
+    frame.animOnly = c
     frame.pendingToast = nil
+  elseif kind == "STRAIGHT" then
+    if frame.animating then frame.pendingToast = { "STRAIGHT!", 0.4, 0.95, 0.4 } else showToast("STRAIGHT!", 0.4, 0.95, 0.4) end
+  elseif kind == "CHASEMISS" then
+    if frame.animating then frame.pendingToast = { "MISSED!", 1, 0.3, 0.25 } else showToast("MISSED!", 1, 0.3, 0.25) end
   elseif kind == "FARKLE" then
     if frame.animating then frame.pendingToast = { "FARKLE!", 1, 0.3, 0.25 } else showToast("FARKLE!", 1, 0.3, 0.25) end
   elseif kind == "HOTDICE" then

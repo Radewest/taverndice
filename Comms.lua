@@ -12,7 +12,7 @@
 --   ACC~gameId~version                                   accepted
 --   DEC~gameId                                           declined
 --   T~gameId~turn~selection~fiveBack                     live selection ("135" = dice 1, 3, 5)
---   A~gameId~turn~selection~act~fiveBack                 act: r = roll on, b = bank
+--   A~gameId~turn~selection~act~fiveBack                 act: r = roll on, b = bank, c = straight chase (v0.2.5+)
 --                                                        fiveBack (v0.2.3+): 1 / 0 / empty = automatic
 --   R~gameId~turn~dice~source~raw                        my roll ("251346"); raw = the /roll value
 --   Q~gameId                                             I left the table

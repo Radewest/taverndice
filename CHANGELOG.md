@@ -1,5 +1,12 @@
 # Tavern Dice changelog
 
+## v0.2.5 (2026-11-10)
+- Mumpits is now called **Mumpets**. Your saved choice carries over.
+- Undid v0.2.4: every roll scores on its own again, so 1s and 5s don't add up across rolls.
+- Two 5s can be **made a 1** (100, one 5 goes back in the cup), or kept as two 5s (also 100). The set-aside tray shows the 1 they became. If keeping both uses your last dice, it's hot dice.
+- **Mumpets straight: 3,000.** Roll six dice one short of a straight (like 1-2-3-4-6-6) and a *Chase the straight!* button appears. Reroll the spare die: hit the missing number for 3,000 (and hot dice), miss and your turn is over, this turn's points are lost, and 500 comes off your score. Scores can go below zero. Grizzle the reckless regular will sometimes take the gamble too.
+- Classic keeps the usual 1,500 straight and has no chase.
+
 ## v0.2.4 (2026-11-10)
 - Mumpits: 1s and 5s you set aside in a turn now add up across rolls. Two 1s, then another 1 = three 1s = 1,000 (and a fourth 1 makes 2,000). The count starts fresh after hot dice. Classic is unchanged.
 - The regulars count this too when choosing dice.

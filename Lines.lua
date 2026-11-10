@@ -102,13 +102,15 @@ local function sound(kind)
     FARKLE = SOUNDKIT.IG_QUEST_FAILED,
     HOTDICE = SOUNDKIT.UI_EPICLOOT_TOAST or SOUNDKIT.IG_QUEST_LIST_COMPLETE,
     OVER = SOUNDKIT.IG_QUEST_LIST_COMPLETE,
+    STRAIGHT = SOUNDKIT.UI_EPICLOOT_TOAST or SOUNDKIT.IG_QUEST_LIST_COMPLETE,
+    CHASEMISS = SOUNDKIT.IG_QUEST_FAILED,
   })[kind]
   if id then pcall(PlaySound, id, "SFX") end
 end
 
 local function stats() return ns.cdb and ns.cdb.stats end
 
-ns:Listen("TD_EVENT", function(kind, a, b, c)
+ns:Listen("TD_EVENT", function(kind, a, b, c, ...)
   local s = stats()
   if kind == "START" then
     wipe(ns.log)
@@ -142,6 +144,18 @@ ns:Listen("TD_EVENT", function(kind, a, b, c)
       s.banked = s.banked + total
       if total > s.bestTurn then s.bestTurn = total end
     end
+  elseif kind == "CHASE" then
+    local p, missing = a, b
+    add(GOLD .. (other(p) and (nameOf(p) .. GOLD .. " picks up the spare die, chasing a " .. missing .. " for the straight...")
+      or ("You pick up the spare die, chasing a " .. missing .. " for the straight...")) .. "|r")
+  elseif kind == "STRAIGHT" then
+    local p, pts = a, b
+    add(GOLD .. "STRAIGHT! " .. (other(p) and (nameOf(p) .. GOLD .. " hits it") or "You hit it") .. ": " .. fmt(pts or 0) .. ". The whole table roars.|r")
+  elseif kind == "CHASEMISS" then
+    local p, lost, die = a, b, c
+    local missing, penalty = ...
+    add(RED .. (other(p) and (nameOf(p) .. RED .. " rolls") or "You roll") .. " a " .. tostring(die) .. ", not a " .. tostring(missing)
+      .. ". The chase fails: turn over, " .. fmt(penalty or 500) .. " off the ledger" .. ((lost or 0) > 0 and (" and " .. fmt(lost) .. " lost") or "") .. ".|r")
   elseif kind == "DESYNC" then
     add(RED .. "The table got out of step with " .. nameOf(a) .. RED .. ". Start a new game if the dice look wrong.|r")
   elseif kind == "FIVEBACK" then

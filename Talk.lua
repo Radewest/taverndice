@@ -16,10 +16,12 @@ local function pick(t) return t[math.random(1, #t)] end
 
 local SAY = {
   hot = { "Hot dice!", "Hot dice! Every last one of them!", "Hot dice! Pass me that cup again." },
+  straight = { "A straight! One through six!", "Straight! Pay up, the lot of you!" },
   win = { "And that's the game!", "Ha! The table is mine!", "Drinks are on the loser!" },
 }
 local EMOTE = {
   hot = { "slams the cup down. \"Hot dice!\"", "grins as every die scores. \"Hot dice!\"" },
+  straight = { "leaps up as the last die lands. \"A straight!\"", "stares at one-through-six and roars." },
   win = { "throws both hands in the air. \"That's the game!\"", "sweeps the winnings into a pouch, grinning." },
   farkle = { "grunts and shoves the dice away.", "grunts.", "glares at the dice and grunts." },
 }
@@ -70,10 +72,13 @@ end
 
 ns:Listen("TD_EVENT", function(kind, p)
   if not p or p.bot or p.remote then return end      -- only our own seat
-  if kind ~= "HOTDICE" and kind ~= "OVER" and kind ~= "FARKLE" then return end
+  if kind == "STRAIGHT" then kind = "HOTDICE_STRAIGHT" elseif kind == "CHASEMISS" then kind = "FARKLE" end
+  if kind ~= "HOTDICE" and kind ~= "OVER" and kind ~= "FARKLE" and kind ~= "HOTDICE_STRAIGHT" then return end
   if not ns:TalkAllowed() then return end
   if kind == "HOTDICE" then
     say("hot")
+  elseif kind == "HOTDICE_STRAIGHT" then
+    say("straight")
   elseif kind == "OVER" then
     doEmote("CHEER")
     say("win")
